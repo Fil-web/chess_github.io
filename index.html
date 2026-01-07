@@ -127,7 +127,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: clamp(30px, 4vw, 40px); /* Фиксированный размер */
+            font-size: clamp(30px, 4vw, 40px);
             cursor: pointer;
             user-select: none;
             transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -429,23 +429,21 @@
         .white-pieces { color: #fff; text-shadow: 0 0 8px rgba(255,255,255,0.5); }
         .black-pieces { color: #000; text-shadow: 0 0 8px rgba(255,255,255,0.8); }
         
-        /* ОБНОВЛЕННЫЕ СТИЛИ ДЛЯ ФИГУР */
         .piece {
             width: 100%;
             height: 100%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: clamp(30px, 4vw, 40px) !important; /* Фиксированный размер */
+            font-size: clamp(30px, 4vw, 40px) !important;
             font-weight: bold;
             transition: all 0.2s;
             position: relative;
-            text-shadow: none !important; /* Убираем старые тени */
+            text-shadow: none !important;
         }
         
         .piece.white {
             color: #ffffff !important;
-            /* Тени для белых фигур */
             text-shadow: 
                 0 0 1px #000,
                 0 0 2px #000,
@@ -454,12 +452,11 @@
                 0 0 5px #000,
                 0 0 6px #000,
                 0 0 7px #000 !important;
-            filter: drop-shadow(0 0 2px rgba(255, 255, 255, 1));
+            filter: drop-shadow(0 0 2px rgba(0,0,0,0.8));
         }
         
         .piece.black {
             color: #000000 !important;
-            /* Тени для черных фигур */
             text-shadow: 
                 0 0 1px #fff,
                 0 0 2px #fff,
@@ -764,7 +761,7 @@
                 </div>
                 
                 <div class="status" id="status">
-                    <span>Ваш ход. Вы играете белыми.</span>
+                    <span>Ваш ход. Вы играете белыми. Нажмите на фигуру, чтобы начать.</span>
                 </div>
                 
                 <div class="game-info">
@@ -930,8 +927,29 @@
                             const newCol = col + dc;
                             if (this.isValidSquare(newRow, newCol)) {
                                 const target = this.board[newRow][newCol];
-                                if (!target || (this.isWhite(target) !== isWhite && target.toLowerCase() !== 'k')) {
-                                    moves.push(this.coordsToSquare(newRow, newCol));
+                                // КОРОЛЬ НЕ МОЖЕТ РУБИТЬ ЗАЩИЩЕННЫЕ ФИГУРЫ
+                                if (!target) {
+                                    // Пустая клетка - проверяем, не под шахом ли она
+                                    const testBoard = new ChessEngine();
+                                    testBoard.board = JSON.parse(JSON.stringify(this.board));
+                                    testBoard.castlingRights = JSON.parse(JSON.stringify(this.castlingRights));
+                                    testBoard.board[newRow][newCol] = piece;
+                                    testBoard.board[row][col] = '';
+                                    if (!testBoard.isKingInCheck(isWhite ? 'w' : 'b')) {
+                                        moves.push(this.coordsToSquare(newRow, newCol));
+                                    }
+                                } else if (this.isWhite(target) !== isWhite && target.toLowerCase() !== 'k') {
+                                    // Вражеская фигура - проверяем, защищена ли она
+                                    if (!this.isSquareAttacked(this.coordsToSquare(newRow, newCol), !isWhite)) {
+                                        const testBoard = new ChessEngine();
+                                        testBoard.board = JSON.parse(JSON.stringify(this.board));
+                                        testBoard.castlingRights = JSON.parse(JSON.stringify(this.castlingRights));
+                                        testBoard.board[newRow][newCol] = piece;
+                                        testBoard.board[row][col] = '';
+                                        if (!testBoard.isKingInCheck(isWhite ? 'w' : 'b')) {
+                                            moves.push(this.coordsToSquare(newRow, newCol));
+                                        }
+                                    }
                                 }
                             }
                         });
@@ -945,14 +963,16 @@
                                     if (!this.board[7][5] && !this.board[7][6] && 
                                         this.board[7][7] === 'R' &&
                                         !this.isSquareAttacked('f1', false) &&
-                                        !this.isSquareAttacked('g1', false)) {
+                                        !this.isSquareAttacked('g1', false) &&
+                                        !this.isSquareAttacked('e1', false)) {
                                         moves.push(this.coordsToSquare(7, 6));
                                     }
                                 } else {
                                     if (!this.board[0][5] && !this.board[0][6] && 
                                         this.board[0][7] === 'r' &&
                                         !this.isSquareAttacked('f8', true) &&
-                                        !this.isSquareAttacked('g8', true)) {
+                                        !this.isSquareAttacked('g8', true) &&
+                                        !this.isSquareAttacked('e8', true)) {
                                         moves.push(this.coordsToSquare(0, 6));
                                     }
                                 }
@@ -963,14 +983,16 @@
                                     if (!this.board[7][1] && !this.board[7][2] && !this.board[7][3] && 
                                         this.board[7][0] === 'R' &&
                                         !this.isSquareAttacked('d1', false) &&
-                                        !this.isSquareAttacked('c1', false)) {
+                                        !this.isSquareAttacked('c1', false) &&
+                                        !this.isSquareAttacked('e1', false)) {
                                         moves.push(this.coordsToSquare(7, 2));
                                     }
                                 } else {
                                     if (!this.board[0][1] && !this.board[0][2] && !this.board[0][3] && 
                                         this.board[0][0] === 'r' &&
                                         !this.isSquareAttacked('d8', true) &&
-                                        !this.isSquareAttacked('c8', true)) {
+                                        !this.isSquareAttacked('c8', true) &&
+                                        !this.isSquareAttacked('e8', true)) {
                                         moves.push(this.coordsToSquare(0, 2));
                                     }
                                 }
@@ -1014,7 +1036,6 @@
             isSquareAttacked(square, byWhite) {
                 const {row, col} = this.squareToCoords(square);
                 
-                // Проверка атаки пешками
                 const pawnDirection = byWhite ? -1 : 1;
                 for (let dc of [-1, 1]) {
                     const r = row + pawnDirection;
@@ -1027,7 +1048,6 @@
                     }
                 }
                 
-                // Проверка атаки конями
                 const knightMoves = [[2,1],[2,-1],[-2,1],[-2,-1],[1,2],[1,-2],[-1,2],[-1,-2]];
                 for (const [dr, dc] of knightMoves) {
                     const r = row + dr;
@@ -1040,7 +1060,6 @@
                     }
                 }
                 
-                // Проверка атаки ладьями и ферзями по прямым
                 const straight = [[1,0],[-1,0],[0,1],[0,-1]];
                 for (const [dr, dc] of straight) {
                     let r = row + dr;
@@ -1059,7 +1078,6 @@
                     }
                 }
                 
-                // Проверка атаки слонами и ферзями по диагоналям
                 const diagonal = [[1,1],[1,-1],[-1,1],[-1,-1]];
                 for (const [dr, dc] of diagonal) {
                     let r = row + dr;
@@ -1078,7 +1096,6 @@
                     }
                 }
                 
-                // Проверка атаки королем
                 const kingMoves = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
                 for (const [dr, dc] of kingMoves) {
                     const r = row + dr;
@@ -1171,14 +1188,38 @@
                 
                 const targetPiece = testBoard.board[toCoords.row][toCoords.col];
                 if (targetPiece && targetPiece.toLowerCase() === 'k') {
-                    return true;
+                    return false;
                 }
                 
-                // ВАЖНОЕ ИСПРАВЛЕНИЕ: Проверяем, что ход не оставляет своего короля под шахом
+                // Для короля проверяем специальные условия
+                if (piece.toLowerCase() === 'k') {
+                    const colDiff = toCoords.col - fromCoords.col;
+                    
+                    // Проверка рокировки
+                    if (Math.abs(colDiff) === 2) {
+                        const step = colDiff > 0 ? 1 : -1;
+                        for (let c = fromCoords.col; c !== toCoords.col; c += step) {
+                            const square = this.coordsToSquare(fromCoords.row, c);
+                            if (this.isSquareAttacked(square, !isWhitePiece)) {
+                                return false;
+                            }
+                        }
+                        if (this.isSquareAttacked(to, !isWhitePiece)) {
+                            return false;
+                        }
+                    }
+                    
+                    // Король не может ходить на атакованную клетку
+                    if (this.isSquareAttacked(to, !isWhitePiece)) {
+                        return false;
+                    }
+                }
+                
+                // Делаем ход на тестовой доске
                 testBoard.board[toCoords.row][toCoords.col] = piece;
                 testBoard.board[fromCoords.row][fromCoords.col] = '';
                 
-                // Обновляем права на рокировку при движении короля или ладьи
+                // Обновляем права на рокировку
                 if (piece.toLowerCase() === 'k') {
                     testBoard.castlingRights[isWhitePiece ? 'white' : 'black'].king = false;
                 } else if (piece.toLowerCase() === 'r') {
@@ -1192,23 +1233,7 @@
                     }
                 }
                 
-                // Проверяем атаку на короля после рокировки
-                if (piece.toLowerCase() === 'k') {
-                    const colDiff = toCoords.col - fromCoords.col;
-                    if (Math.abs(colDiff) === 2) {
-                        const step = colDiff > 0 ? 1 : -1;
-                        for (let c = fromCoords.col; c !== toCoords.col; c += step) {
-                            const square = this.coordsToSquare(fromCoords.row, c);
-                            if (this.isSquareAttacked(square, !isWhitePiece)) {
-                                return false;
-                            }
-                        }
-                        if (this.isSquareAttacked(to, !isWhitePiece)) {
-                            return false;
-                        }
-                    }
-                }
-                
+                // Проверяем, не остается ли король под шахом
                 return !testBoard.isKingInCheck(pieceColor);
             }
             
@@ -1533,6 +1558,7 @@
         let moveCount = 1;
         let soundEnabled = true;
         let pendingPromotion = null;
+        let gameStarted = false; // Флаг начала игры
         
         // ============= ТАЙМЕР (1 МИНУТА) =============
         let whiteTime = 60;
@@ -1541,7 +1567,6 @@
         let isTimerRunning = false;
         let lastMoveTime = Date.now();
         
-        // Обновленные символы фигур (закрашенные)
         const pieceSymbols = {
             'r': '♜', 'n': '♞', 'b': '♝', 'q': '♛', 'k': '♚', 'p': '♟',
             'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔', 'P': '♙'
@@ -1614,6 +1639,17 @@
             } catch (e) {}
         }
         
+        function startTimer() {
+            if (!gameStarted || chess.gameOver) return;
+            
+            isTimerRunning = true;
+            lastMoveTime = Date.now();
+            
+            if (!timerInterval) {
+                timerInterval = setInterval(updateTimer, 100);
+            }
+        }
+        
         function updateTimer() {
             if (!isTimerRunning || chess.gameOver) return;
             
@@ -1669,8 +1705,8 @@
             }
         }
         
-        function toggleTimer(forceStart = false) {
-            if (chess.gameOver) {
+        function toggleTimer(forceStop = false) {
+            if (chess.gameOver || forceStop) {
                 if (timerInterval) {
                     clearInterval(timerInterval);
                     timerInterval = null;
@@ -1679,17 +1715,11 @@
                 return;
             }
             
-            if (forceStart || !isTimerRunning) {
-                isTimerRunning = true;
-                lastMoveTime = Date.now();
-                
-                if (!timerInterval) {
-                    timerInterval = setInterval(updateTimer, 100);
-                }
-            } else {
-                isTimerRunning = false;
-                updateTimer();
-            }
+            if (!gameStarted) return;
+            
+            updateTimer();
+            lastMoveTime = Date.now();
+            updateTimerDisplay();
         }
         
         function handleTimeout(color) {
@@ -1704,14 +1734,6 @@
             playSound('mate');
             updateStatus();
             updateBoard();
-        }
-        
-        function switchTimer() {
-            if (!isTimerRunning) return;
-            
-            updateTimer();
-            lastMoveTime = Date.now();
-            updateTimerDisplay();
         }
         
         function checkForStalemate() {
@@ -1825,7 +1847,6 @@
             updateStatus();
             updatePieceCount();
             updateTimerDisplay();
-            toggleTimer(true);
         }
         
         function updateBoard() {
@@ -1947,6 +1968,13 @@
                 return;
             }
             
+            // Запускаем таймер при первом ходе
+            if (!gameStarted) {
+                gameStarted = true;
+                startTimer();
+                updateStatus();
+            }
+            
             if (possibleMoves.includes(square)) {
                 const piece = chess.getPiece(selectedSquare);
                 const isPawn = piece && piece.toLowerCase() === 'p';
@@ -2012,7 +2040,7 @@
             selectedSquare = null;
             possibleMoves = [];
             
-            switchTimer();
+            toggleTimer();
             
             addMoveToHistory(move);
             moveCount++;
@@ -2055,7 +2083,7 @@
                     
                     playSound('move');
                     
-                    switchTimer();
+                    toggleTimer();
                     
                     const moveInfo = chess.history[chess.history.length - 1];
                     addMoveToHistory(moveInfo, true);
@@ -2124,6 +2152,11 @@
             }
             
             status.classList.remove('victory', 'warning', 'draw');
+            
+            if (!gameStarted) {
+                status.innerHTML = '🎮 <strong>Нажмите на любую белую фигуру, чтобы начать игру</strong>';
+                return;
+            }
             
             if (chess.turn === 'w') {
                 status.innerHTML = '✅ <strong>Ваш ход</strong> (белые)';
@@ -2309,6 +2342,7 @@
             whiteTime = 60;
             blackTime = 60;
             pendingPromotion = null;
+            gameStarted = false;
             hidePromotionModal();
             
             if (timerInterval) {
@@ -2324,8 +2358,6 @@
             updateStatus();
             updatePieceCount();
             updateTimerDisplay();
-            
-            toggleTimer(true);
         });
         
         document.getElementById('flipBtn').addEventListener('click', () => {
