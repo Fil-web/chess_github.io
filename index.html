@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Шахматный бот Stockfish</title>
+    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        #board {
+            width: 480px;
+            height: 480px;
+            margin: 20px auto;
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+        button {
+            padding: 12px 24px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button#undoBtn {
+            background: #ff9800;
+        }
+        button#hintBtn {
+            background: #2196F3;
+        }
+        .status {
+            text-align: center;
+            font-size: 20px;
+            font-weight: bold;
+            margin: 20px;
+            min-height: 40px;
+            color: #333;
+        }
+        .difficulty {
+            text-align: center;
+            margin: 20px 0;
+        }
+        select {
+            padding: 8px;
+            font-size: 16px;
+            border-radius: 5px;
+            margin-left: 10px;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>♛ Шахматный бот с Stockfish ♚</h1>
+        
+        <div class="difficulty">
+            <label for="level">Уровень сложности:</label>
+            <select id="level">
+                <option value="1">Новичок (уровень 1)</option>
+                <option value="5" selected>Любитель (уровень 5)</option>
+                <option value="10">Продвинутый (уровень 10)</option>
+                <option value="15">Эксперт (уровень 15)</option>
+                <option value="20">Гроссмейстер (уровень 20)</option>
+            </select>
+        </div>
+        
+        <div id="board"></div>
+        
+        <div class="status" id="status">Ваш ход. Вы играете белыми.</div>
+        
+        <div class="controls">
+            <button id="newGameBtn">Новая игра ♻️</button>
+            <button id="undoBtn">Отменить ход ↩️</button>
+            <button id="hintBtn">Подсказка 💡</button>
+            <button id="flipBtn">Перевернуть доску 🔄</button>
+        </div>
+        
+        <div id="moveHistory" style="margin-top: 20px; text-align: center;"></div>
+    </div>
+
+    <!-- Библиотеки -->
+    <script src="https://unpkg.com/chess.js@0.13.4/chess.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+    <!-- Stockfish.js - шахматный движок -->
+    <script src="https://unpkg.com/stockfish.js@11.0.0/stockfish.js"></script>
+    
+    <script>
+        // Инициализация
+        const chess = new Chess();
+        let board = null;
+        let gameOver = false;
+        let stockfish = null;
+        let difficulty = 5; // Уровень сложности (1-20)
+        
+        // Инициализация Stockfish
+        function initStockfish() {
+            stockfish = new Worker('https://unpkg.com/stockfish.js@11.0.0/stockfish.js');
+            
+            stockfish.onmessage = function(event) {
+                const message = event.data;
+                
+                if (message.startsWith('bestmove')) {
+                    const move = message.split(' ')[1];
+                    if (move && move !== '(none)') {
+                        makeStockfishMove(move);
+                    }
+                }
+            };
+            
+            setDifficulty(difficulty);
+        }
+        
+        // Установка уровня сложности
+        function setDifficulty(level) {
+            difficulty = parseInt(level);
+            if (stockfish) {
+                stockfish.postMessage('setoption name Skill Level value ' + difficulty);
+            }
+        }
+        
+        // Настройка доски
+        function initBoard() {
+            const config = {
+                draggable: true,
+                position: 'start',
+                orientation: 'white',
+                onDragStart: onDragStart,
+                onDrop: onDrop,
+                onSnapEnd: onSnapEnd
+            };
+            board = Chessboard('board', config);
+            updateStatus();
+            initStockfish();
+        }
+        
+        // Начало перетаскивания фигуры
+        function onDragStart(source, piece) {
+            if (gameOver) return false;
+            if (chess.turn() === 'w' && piece.search(/^b/) !== -1) return false;
+            if (chess.turn() === 'b' && piece.search(/^w/) !== -1) return false;
+        }
+        
+        // Когда фигура брошена
+        function onDrop(source, target) {
+            if (gameOver) return 'snapback';
+            
+            const move = chess.move({
+                from: source,
+                to: target,
+                promotion: 'q'
+            });
+            
+            if (move === null) return 'snapback';
+            
+            updateStatus();
+            updateMoveHistory();
+            
+            // Ход Stockfish
+            if (!chess.game_over()) {
+                setTimeout(() => {
+                    getStockfishMove();
+                }, 300);
+            }
+        }
+        
+        // Получить ход от Stockfish
+        function getStockfishMove() {
+            if (!stockfish || gameOver) return;
+            
+            stockfish.postMessage('position fen ' + chess.fen());
+            stockfish.postMessage('go depth 12');
+        }
+        
+        // Сделать ход Stockfish
+        function makeStockfishMove(moveString) {
+            if (gameOver) return;
+            
+            const move = chess.move(moveString);
+            if (move) {
+                board.position(chess.fen());
+                updateStatus();
+                updateMoveHistory();
+            }
+        }
+        
+        // После анимации
+        function onSnapEnd() {
+            board.position(chess.fen());
+        }
+        
+        // Обновление статуса
+        function updateStatus() {
+            let status = '';
+            let color = chess.turn() === 'w' ? '#2196F3' : '#f44336';
+            
+            if (chess.turn() === 'w') {
+                status = 'Ваш ход (белые)';
+            } else {
+                status = 'Бот думает...';
+            }
+            
+            if (chess.in_check()) {
+                status += ' - ШАХ!';
+            }
+            
+            if (chess.game_over()) {
+                gameOver = true;
+                if (chess.in_checkmate()) {
+                    status = 'ШАХ И МАТ! ' + 
+                           (chess.turn() === 'w' ? 'Вы проиграли!' : 'Вы победили!');
+                } else if (chess.in_draw()) {
+                    status = 'НИЧЬЯ!';
+                } else if (chess.in_stalemate()) {
+                    status = 'ПАТ!';
+                } else if (chess.in_threefold_repetition()) {
+                    status = 'НИЧЬЯ (троекратное повторение)';
+                }
+            }
+            
+            document.getElementById('status').innerHTML = status;
+            document.getElementById('status').style.color = color;
+        }
+        
+        // История ходов
+        function updateMoveHistory() {
+            const moves = chess.history();
+            const moveList = document.getElementById('moveHistory');
+            let html = '<strong>История ходов:</strong><br>';
+            
+            for (let i = 0; i < moves.length; i += 2) {
+                const moveNumber = Math.floor(i / 2) + 1;
+                const whiteMove = moves[i] || '';
+                const blackMove = moves[i + 1] || '';
+                html += `${moveNumber}. ${whiteMove} ${blackMove}<br>`;
+            }
+            
+            moveList.innerHTML = html;
+        }
+        
+        // Обработчики событий
+        document.getElementById('newGameBtn').addEventListener('click', () => {
+            chess.reset();
+            gameOver = false;
+            board.position(chess.fen());
+            board.orientation('white');
+            updateStatus();
+            updateMoveHistory();
+            document.getElementById('moveHistory').innerHTML = '';
+        });
+        
+        document.getElementById('undoBtn').addEventListener('click', () => {
+            chess.undo();
+            chess.undo();
+            board.position(chess.fen());
+            gameOver = false;
+            updateStatus();
+            updateMoveHistory();
+        });
+        
+        document.getElementById('hintBtn').addEventListener('click', () => {
+            if (chess.turn() !== 'w' || chess.game_over()) return;
+            
+            // Запрос подсказки у Stockfish
+            stockfish.postMessage('position fen ' + chess.fen());
+            stockfish.postMessage('go depth 10');
+            
+            const originalHandler = stockfish.onmessage;
+            stockfish.onmessage = function(event) {
+                const message = event.data;
+                if (message.startsWith('bestmove')) {
+                    const move = message.split(' ')[1];
+                    if (move && move !== '(none)') {
+                        alert('Подсказка: ' + move);
+                    }
+                    stockfish.onmessage = originalHandler;
+                }
+            };
+        });
+        
+        document.getElementById('flipBtn').addEventListener('click', () => {
+            board.flip();
+        });
+        
+        document.getElementById('level').addEventListener('change', (e) => {
+            setDifficulty(e.target.value);
+        });
+        
+        // Инициализация
+        $(document).ready(initBoard);
+    </script>
+</body>
+</html>
