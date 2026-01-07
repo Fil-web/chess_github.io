@@ -127,7 +127,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: clamp(24px, 4vw, 45px);
+            font-size: clamp(30px, 4vw, 40px); /* Фиксированный размер */
             cursor: pointer;
             user-select: none;
             transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -429,16 +429,43 @@
         .white-pieces { color: #fff; text-shadow: 0 0 8px rgba(255,255,255,0.5); }
         .black-pieces { color: #000; text-shadow: 0 0 8px rgba(255,255,255,0.8); }
         
-        .piece.white {
-            color: #ffffff;
-            text-shadow: 2px 2px 6px rgba(0,0,0,0.9), 0 0 12px rgba(255,255,255,0.5);
+        /* ОБНОВЛЕННЫЕ СТИЛИ ДЛЯ ФИГУР */
+        .piece {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: clamp(30px, 4vw, 40px) !important; /* Фиксированный размер */
+            font-weight: bold;
             transition: all 0.2s;
+            position: relative;
+            text-shadow: none !important; /* Убираем старые тени */
+        }
+        
+        .piece.white {
+            color: #ffffff !important;
+            /* Тени для белых фигур */
+            text-shadow: 
+                0 0 1px #000,
+                0 0 2px #000,
+                0 0 3px #000,
+                0 0 4px #000,
+                0 0 5px #000,
+                0 0 6px #000,
+                0 0 7px #000 !important;
+            filter: drop-shadow(0 0 2px rgba(255, 255, 255, 1));
         }
         
         .piece.black {
-            color: #000000;
-            text-shadow: 2px 2px 6px rgba(255,255,255,0.9), 0 0 12px rgba(0,0,0,0.3);
-            transition: all 0.2s;
+            color: #000000 !important;
+            /* Тени для черных фигур */
+            text-shadow: 
+                0 0 1px #fff,
+                0 0 2px #fff,
+                0 0 3px #fff,
+                0 0 4px #fff !important;
+            filter: drop-shadow(0 0 2px rgba(255,255,255,0.3));
         }
         
         .piece.selected-piece {
@@ -987,6 +1014,7 @@
             isSquareAttacked(square, byWhite) {
                 const {row, col} = this.squareToCoords(square);
                 
+                // Проверка атаки пешками
                 const pawnDirection = byWhite ? -1 : 1;
                 for (let dc of [-1, 1]) {
                     const r = row + pawnDirection;
@@ -999,6 +1027,7 @@
                     }
                 }
                 
+                // Проверка атаки конями
                 const knightMoves = [[2,1],[2,-1],[-2,1],[-2,-1],[1,2],[1,-2],[-1,2],[-1,-2]];
                 for (const [dr, dc] of knightMoves) {
                     const r = row + dr;
@@ -1011,6 +1040,7 @@
                     }
                 }
                 
+                // Проверка атаки ладьями и ферзями по прямым
                 const straight = [[1,0],[-1,0],[0,1],[0,-1]];
                 for (const [dr, dc] of straight) {
                     let r = row + dr;
@@ -1029,6 +1059,7 @@
                     }
                 }
                 
+                // Проверка атаки слонами и ферзями по диагоналям
                 const diagonal = [[1,1],[1,-1],[-1,1],[-1,-1]];
                 for (const [dr, dc] of diagonal) {
                     let r = row + dr;
@@ -1047,6 +1078,7 @@
                     }
                 }
                 
+                // Проверка атаки королем
                 const kingMoves = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
                 for (const [dr, dc] of kingMoves) {
                     const r = row + dr;
@@ -1142,6 +1174,25 @@
                     return true;
                 }
                 
+                // ВАЖНОЕ ИСПРАВЛЕНИЕ: Проверяем, что ход не оставляет своего короля под шахом
+                testBoard.board[toCoords.row][toCoords.col] = piece;
+                testBoard.board[fromCoords.row][fromCoords.col] = '';
+                
+                // Обновляем права на рокировку при движении короля или ладьи
+                if (piece.toLowerCase() === 'k') {
+                    testBoard.castlingRights[isWhitePiece ? 'white' : 'black'].king = false;
+                } else if (piece.toLowerCase() === 'r') {
+                    const color = isWhitePiece ? 'white' : 'black';
+                    if (fromCoords.row === (isWhitePiece ? 7 : 0)) {
+                        if (fromCoords.col === 0) {
+                            testBoard.castlingRights[color].queenside = false;
+                        } else if (fromCoords.col === 7) {
+                            testBoard.castlingRights[color].kingside = false;
+                        }
+                    }
+                }
+                
+                // Проверяем атаку на короля после рокировки
                 if (piece.toLowerCase() === 'k') {
                     const colDiff = toCoords.col - fromCoords.col;
                     if (Math.abs(colDiff) === 2) {
@@ -1154,22 +1205,6 @@
                         }
                         if (this.isSquareAttacked(to, !isWhitePiece)) {
                             return false;
-                        }
-                    }
-                }
-                
-                testBoard.board[toCoords.row][toCoords.col] = piece;
-                testBoard.board[fromCoords.row][fromCoords.col] = '';
-                
-                if (piece.toLowerCase() === 'k') {
-                    testBoard.castlingRights[isWhitePiece ? 'white' : 'black'].king = false;
-                } else if (piece.toLowerCase() === 'r') {
-                    const color = isWhitePiece ? 'white' : 'black';
-                    if (fromCoords.row === (isWhitePiece ? 7 : 0)) {
-                        if (fromCoords.col === 0) {
-                            testBoard.castlingRights[color].queenside = false;
-                        } else if (fromCoords.col === 7) {
-                            testBoard.castlingRights[color].kingside = false;
                         }
                     }
                 }
@@ -1506,6 +1541,7 @@
         let isTimerRunning = false;
         let lastMoveTime = Date.now();
         
+        // Обновленные символы фигур (закрашенные)
         const pieceSymbols = {
             'r': '♜', 'n': '♞', 'b': '♝', 'q': '♛', 'k': '♚', 'p': '♟',
             'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔', 'P': '♙'
